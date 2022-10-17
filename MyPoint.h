@@ -94,6 +94,11 @@ public:
         return _p;
     }
 
+    float getAngle(MyPoint p) {
+        float m = mult(p).z;
+        return m/(sqrt(l2()) * sqrt(p.l2()));
+    }
+
     float x;
     float y;
     float z;

@@ -118,7 +118,7 @@ void trajectoriesFunc() {
 
         if(draw_is)
         ellipse(interaction_scene, nearest, {(int)ball.rad, static_cast<int>(ball.rad * ball.getLeanY())}, 0, 0,
-                180, Scalar(100,255,100));
+                180, Scalar(100,255,100), 2);
 
         int radius = ball.rad;
 
@@ -144,6 +144,21 @@ void trajectoriesFunc() {
         if(draw_is)
         line(interaction_scene, nearest, nearest + Point{(int)dirTang.x, (int)dirTang.y} , Scalar(200,255,100), 2);
 
+        // rezka
+        {
+            int rad = 27;
+            stickDir.y /= ball.getLeanY();
+            dir.y /= ball.getLeanY();
+
+            int shift = sin(stickDir.getAngle(dir)) * rad * 2;
+
+            if(draw_is) {
+                circle(interaction_scene, Point(interaction_scene.size().width - 60, 60),
+                       rad, Scalar(0, 255, 255), -2, LINE_AA);
+                circle(interaction_scene, Point(interaction_scene.size().width - 60 + shift, 60),
+                       rad, Scalar(255, 0, 255), -2, LINE_AA);
+            }
+        }
     }
 
     imshow("billiard", interaction_scene);
@@ -173,10 +188,7 @@ int main()
 
     VideoCapture cap("http://192.168.0.100:8080//video?x.mjpeg&req_fps=10");
 
-    if (!cap.isOpened()) {
-        cout << "cam is not found\n";
-    }
-
+    while(!cap.isOpened());
 
     // Loads an image
     const char *filename = "billiard.jpg";
@@ -192,6 +204,10 @@ int main()
         const char *filename = "billiard.jpg";
 //        src = imread( filename );
         cap >> src;
+        if(src.empty()) {
+            cap.open("http://192.168.0.100:8080//video?x.mjpeg&req_fps=10");
+            continue;
+        }
         resize(src,src,Size(src.size().width/2.6, src.size().height/2.6));
         auto matrix = getRotationMatrix2D(
                 Point2f{(float)src.size().width/2, (float)src.size().height/2}, hue_rads*180/3.14, 1);
@@ -210,7 +226,7 @@ int main()
         vector<Vec3f> circles;
         HoughCircles(gray, circles, HOUGH_GRADIENT, 1,
                      gray.rows / 16,  // change this value to detect circles with different distances to each other
-                     110, 30, 7, 50 // change the last two parameters
+                     120, 30, 7, 50 // change the last two parameters
                 // (min_radius & max_radius) to detect larger circles
         );
 
@@ -218,6 +234,8 @@ int main()
         for (const auto &circle: circles) {
             balls.emplace_back(Vec2f(circle[0], circle[1]), circle[2]);
         }
+
+        sort(balls.begin(), balls.end(), [](Ball a, Ball b){return a.centre.y>b.centre.y;});
 
         int rad_max = 0;
         int ind = 0;
@@ -241,21 +259,10 @@ int main()
 
             // real ellipse
             ellipse(src, center, {radius, static_cast<int>(radius * ball.getLeanY())}, 0, 0,
-                    180, Scalar(255, 0, 255));
+                    180, Scalar(255, 0, 255),2);
 
             ind++;
         }
-
-        // compute horiz
-//        horiz = 0;
-//        if ((striker.rad > 0) && (horiz_ball.rad > 0)) {
-//            int a = striker.rad;
-//            int b = horiz_ball.rad;
-//            int d = striker.centre.y - horiz_ball.centre.y;
-//            if(((a - b) != 0) && (d > 0))
-//                horiz = striker.centre.y - a * d / (a - b);
-//            cout << "horiz: " << horiz << endl;
-//        }
 
         trajectoriesFunc();
 
@@ -265,7 +272,7 @@ int main()
     return EXIT_SUCCESS;
 }
 
-#include "UDPServer.h"
+#include "GravityProcessing.h"
 void gyroTask() {
 //    int8_t gx, gy,gz;
 //    float leny, lenx;
@@ -296,5 +303,6 @@ void gyroTask() {
 //        }
 //        std::this_thread::sleep_for(std::chrono::milliseconds(150));
 //    }
-    UDPServer();
+//    UDPServer();
+curl_main();
 }
