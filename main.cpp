@@ -43,8 +43,8 @@ public:
         return(sqrt(cos(phi) * cos(phi) + getLeanY() * getLeanY() * sin(phi) * sin(phi)));
     }
 
-    Point findNearestCentre(MyPoint origin, MyPoint direction) {
-        Point cen{0, 0};
+    Point2f findNearestCentre(MyPoint origin, MyPoint direction) {
+        Point2f cen{0, 0};
 
 
         len_min = 10000000;
@@ -77,7 +77,7 @@ public:
     }
 
 //private:
-    Point centre;
+    Point2f centre;
     float rad;
     static constexpr float rads_per_length = 0.0025;
 };
@@ -93,18 +93,18 @@ void trajectoriesFunc() {
     circle( interaction_scene, Point(mouse_x,mouse_y), 1, Scalar(0,100,100), 2, LINE_AA);
 
     // for  stick
-    MyPoint p(Point(mouse_x,mouse_y) - striker.centre);
+    MyPoint p(Point2f(mouse_x,mouse_y) - striker.centre);
     p = p.norm().mult(striker.rad);
     if(p.y > 0) {
         p = p.mult(striker.getLean(p.getAtan()));
     }
-    Point intend{(int) p.x, (int)p.y};
+    Point2f intend{ p.x, p.y};
 
     // draw stick
     if(draw_is)
     line(interaction_scene, Point(mouse_x,mouse_y), striker.centre + intend , Scalar(255,210,210), 5);
 
-    MyPoint stickDir{Point(mouse_x,mouse_y) - striker.centre};
+    MyPoint stickDir{Point2f(mouse_x,mouse_y) - striker.centre};
     stickDir = stickDir.norm();
 
     for(auto& ball: balls) {
@@ -112,7 +112,7 @@ void trajectoriesFunc() {
             continue;
         }
 
-        Point nearest = ball.findNearestCentre(striker.centre, MyPoint(Point(mouse_x, mouse_y) - striker.centre).norm() );
+        Point2f nearest = ball.findNearestCentre(striker.centre, MyPoint(Point2f(mouse_x, mouse_y) - striker.centre).norm() );
         if(nearest == striker.centre )
             continue;
 
@@ -131,7 +131,7 @@ void trajectoriesFunc() {
         dir = dir.mult(1000);
 
         if(draw_is)
-        line(interaction_scene, ball.centre, ball.centre + Point{(int)dir.x, (int)dir.y} , Scalar(255,0,255), 2);
+        line(interaction_scene, ball.centre, ball.centre + Point2f{dir.x, dir.y} , Scalar(255,0,255), 2);
 
         // svoj shar, otskok
         MyPoint dirTang = ball.getTangentDir(dir);
@@ -142,7 +142,7 @@ void trajectoriesFunc() {
         dirTang = dirTang.mult(_sign);
 
         if(draw_is)
-        line(interaction_scene, nearest, nearest + Point{(int)dirTang.x, (int)dirTang.y} , Scalar(200,255,100), 2);
+        line(interaction_scene, nearest, nearest + Point2f{dirTang.x, dirTang.y} , Scalar(200,255,100), 2);
 
         // rezka
         {
@@ -180,13 +180,14 @@ void CallBackFunc(int event, int x, int y, int flags, void* userdata)
 }
 
 
-
+string ip_addr = "192.168.40.178:8080";
+//                    "192.168.0.100:8080";
 int main()
 {
     gravity_thread = thread(gyroTask);
     gravity_thread.detach();
 
-    VideoCapture cap("http://192.168.0.100:8080//video?x.mjpeg&req_fps=10");
+    VideoCapture cap("http://" +ip_addr +"//video?x.mjpeg&req_fps=10");
 
     while(!cap.isOpened());
 
@@ -202,10 +203,13 @@ int main()
     for(;;) {
         // Loads an image
         const char *filename = "billiard.jpg";
+
+
 //        src = imread( filename );
         cap >> src;
         if(src.empty()) {
-            cap.open("http://192.168.0.100:8080//video?x.mjpeg&req_fps=10");
+
+            cap.open("http://" +ip_addr +"//video?x.mjpeg&req_fps=10");
             continue;
         }
         resize(src,src,Size(src.size().width/2.6, src.size().height/2.6));
@@ -224,7 +228,7 @@ int main()
         cvtColor(src, gray, COLOR_BGR2GRAY);
         medianBlur(gray, gray, 7);
         vector<Vec3f> circles;
-        HoughCircles(gray, circles, HOUGH_GRADIENT, 1,
+        HoughCircles(gray, circles, HOUGH_GRADIENT, 1.1,
                      gray.rows / 16,  // change this value to detect circles with different distances to each other
                      120, 30, 7, 50 // change the last two parameters
                 // (min_radius & max_radius) to detect larger circles
@@ -240,7 +244,7 @@ int main()
         int rad_max = 0;
         int ind = 0;
         for (auto &ball: balls) {
-            Point center = ball.centre;
+            Point2f center = ball.centre;
             if (ball.rad > rad_max) {
                 rad_max = ball.rad;
                 horiz_ball = striker;
@@ -254,7 +258,7 @@ int main()
 
             // circle outline
             circle(src, center, radius, Scalar(255, 0, 255), 2, LINE_AA);
-            putText(src, to_string(ind), center + Point(-radius, -radius), {}, 0.5, Scalar(255, 0, 255), 2,
+            putText(src, to_string(ind), (Point)center + Point(-radius, -radius), {}, 0.5, Scalar(255, 0, 255), 2,
                     LINE_AA);
 
             // real ellipse

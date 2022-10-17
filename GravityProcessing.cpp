@@ -143,11 +143,12 @@ static size_t cb(void *data, size_t size, size_t nmemb, void *userp)
 #include <algorithm>
 #include <thread>
 
+extern string ip_addr;
 void curl_main() {
     CURL *curl;
     CURLcode res;
 
-    const string temp = "http://192.168.0.100:8080/sensors.json";
+    string temp = "http://" + ip_addr + "/sensors.json";
 
     curl = curl_easy_init();
 

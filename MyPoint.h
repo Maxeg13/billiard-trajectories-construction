@@ -11,7 +11,7 @@ using namespace cv;
 class MyPoint
 {
 public:
-    MyPoint(Point p): x(p.x), y(p.y) {
+    MyPoint(Point2f p): x(p.x), y(p.y) {
 
     }
     MyPoint(float x, float y, float z): x(x), y(y), z(z) {
