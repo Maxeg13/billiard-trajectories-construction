@@ -100,6 +100,8 @@ Ball operator+(const Ball& b1, const Ball& b2) {
 Ball cue_ball;
 vector<deque<Ball>> correctors;
 void trajectoriesFunc();
+int param1 = 140, param2 = 40;
+int* mouse_interface = &param1;
 
 void CallBackFunc(int event, int x, int y, int flags, void* userdata)
 {
@@ -108,10 +110,33 @@ void CallBackFunc(int event, int x, int y, int flags, void* userdata)
         draw_is = !draw_is;
         cout << "draw is: " << draw_is << endl;
     }
+    else if  ( event == EVENT_RBUTTONDOWN )
+    {
+        cout<<"mouse interface, ";
+        static int cnt = 0;
+        cnt++;
+        switch(cnt%2) {
+            case 0:
+                cout<<"param1"<<endl;
+                mouse_interface = &param1;
+                break;
+            case 1:
+                cout<<"param2"<<endl;
+                mouse_interface = &param2;
+                break;
+        }
+
+    }
     else if ( event == EVENT_MOUSEMOVE )
     {
         mouse_x = x;
         mouse_y = y;
+    }
+    else if( event == EVENT_MOUSEWHEEL) {
+        int sign_ = (flags>0)?(1):(-1);
+        *mouse_interface += 2 * sign_;
+        cout << "flags: " << flags << endl;
+        cout << "val: " << *mouse_interface << endl;
     }
 }
 
@@ -163,7 +188,7 @@ int main()
         vector<Vec3f> circles;
         HoughCircles(gray, circles, HOUGH_GRADIENT, 1.,
                      gray.rows / 16,  // change this value to detect circles with different distances to each other
-                     140, 40, 7, 50 // change the last two parameters 180 50
+                     param1, param2, 7, 50 // change the last two parameters 180 50
                 // (min_radius & max_radius) to detect larger circles
         );
 
