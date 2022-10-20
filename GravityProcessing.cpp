@@ -207,14 +207,3 @@ void curl_main() {
         }
     }
 }
-
-//Mat frame_HSV;
-//Mat gray_HSV;
-//cvtColor(src, frame_HSV, COLOR_BGR2HSV);
-//Mat hsv_bgr;
-//inRange(frame_HSV, Scalar(low_H, 0, low_V), Scalar(high_H, max_value, high_V), hsv_bgr);
-//bitwise_not(hsv_bgr, hsv_bgr);
-//cvtColor(hsv_bgr, hsv_bgr, COLOR_GRAY2BGR);
-//bitwise_and(src, hsv_bgr, src);
-//
-////        imshow("HSV", src);

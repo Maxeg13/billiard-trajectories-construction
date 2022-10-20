@@ -182,13 +182,12 @@ int main()
                 same = same && balls[i].isSame(ex);
 
             }
-            if(same) {
-                deq.push_back(balls[i]);
-            } else {
-                cout<<"clear"<<endl;
+            if(!same) {
+                cout<<"clear smoothing buf"<<endl;
                 deq.clear();
-                deq.push_back(balls[i]);
             }
+            deq.push_back(balls[i]);
+
             if(correctors[i].size()>7)
                 correctors[i].pop_front();
 
