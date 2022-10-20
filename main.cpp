@@ -1,4 +1,5 @@
 //https://docs.opencv.org/3.4/da/d97/tutorial_threshold_inRange.html
+// don forget to cvt colors if different channels size making bitwise operations
 #include <math.h>
 #include "opencv2/imgcodecs.hpp"
 #include "opencv2/highgui.hpp"
@@ -9,7 +10,6 @@
 #include <iostream>
 using namespace cv;
 using namespace std;
-//Serial* serial;
 int mouse_x;
 int mouse_y;
 int horiz;
@@ -22,10 +22,9 @@ float main_rads;
 struct Ball;
 vector<Ball> balls;
 
-
 uint64 len_min = 10000000;
 
-void gyroTask();
+void graviTask();
 
 struct Ball { // and ellipse, though
 public:
@@ -48,9 +47,7 @@ public:
     }
 
     Point2f findNearestCentre(MyPoint origin, MyPoint direction) {
-        Point2f cen{0, 0};
-
-
+        Point2f cen;
         len_min = 10000000;
         for(float phi = -3.14; phi < 3.14; phi += 0.002) {
             MyPoint tmp{2 * getX(phi), 2 * getY(phi), 0};
@@ -87,12 +84,6 @@ public:
             (fabs(rad-b.rad) < tolerance));
     }
 
-    Ball(const Ball& b) {
-        rad = b.rad;
-        centre = b.centre;
-//        return
-    }
-
 //private:
     Point2f centre;
     float rad;
@@ -106,8 +97,7 @@ Ball operator+(const Ball& b1, const Ball& b2) {
     return res;
 }
 
-Ball striker;
-Ball horiz_ball;
+Ball cue_ball;
 vector<deque<Ball>> correctors;
 void trajectoriesFunc();
 
@@ -125,7 +115,7 @@ void CallBackFunc(int event, int x, int y, int flags, void* userdata)
     }
 }
 
-//#define DEBUG
+#define DEBUG
 const char *filename = "billiard.jpg";
 string ip_addr = //"192.168.40.178:8080";
         "192.168.0.100:8080";
@@ -133,7 +123,7 @@ int main()
 {
     namedWindow( "billiard");
 #ifndef DEBUG // usual
-    gravity_thread = thread(gyroTask);
+    gravity_thread = thread(graviTask);
     gravity_thread.detach();
 
     VideoCapture cap("http://" +ip_addr +"//video?x.mjpeg&req_fps=10");
@@ -161,7 +151,6 @@ int main()
         warpAffine(src, src, matrix, src.size());
 #endif
 
-        // Check if image is loaded fine
         if (src.empty()) {
             cout << "empty\n";
             printf(" Error opening image\n");
@@ -184,7 +173,7 @@ int main()
         }
         sort(balls.begin(), balls.end(), [](Ball a, Ball b){return a.centre.y>b.centre.y;});
 
-        //correction update
+        //smoothed motion
         correctors.resize(balls.size());
         for (int i = 0; i<balls.size(); i++) {
             auto& deq = correctors[i];
@@ -217,6 +206,7 @@ int main()
             }
         }
 
+        // draw primary stuff
         int rad_max = 0;
         int ind = 0;
         for (auto &ball: balls) {
@@ -224,8 +214,7 @@ int main()
             Point2f center = ball.centre;
             if (ball.rad > rad_max) {
                 rad_max = ball.rad;
-                horiz_ball = striker;
-                striker = ball;
+                cue_ball = ball;
             }
 
             int radius = ball.rad;
@@ -260,28 +249,28 @@ void trajectoriesFunc() {
 
     circle( interaction_scene, Point(mouse_x,mouse_y), 1, Scalar(0,100,100), 2, LINE_AA);
 
-    // for  stick
-    MyPoint p(Point2f(mouse_x,mouse_y) - striker.centre);
-    p = p.norm().mult(striker.rad);
+    // for  cue
+    MyPoint p(Point2f(mouse_x,mouse_y) - cue_ball.centre);
+    p = p.norm().mult(cue_ball.rad);
     if(p.y > 0) {
-        p = p.mult(striker.getLean(p.getAtan()));
+        p = p.mult(cue_ball.getLean(p.getAtan()));
     }
     Point2f intend{ p.x, p.y};
 
-    // draw stick
+    // draw cue
     if(draw_is)
-        line(interaction_scene, Point(mouse_x,mouse_y), striker.centre + intend , Scalar(255,210,210), 5);
+        line(interaction_scene, Point(mouse_x,mouse_y), cue_ball.centre + intend , Scalar(255, 210, 210), 5);
 
-    MyPoint stickDir{Point2f(mouse_x,mouse_y) - striker.centre};
-    stickDir = stickDir.norm();
+    MyPoint cueDir{Point2f(mouse_x,mouse_y) - cue_ball.centre};
+    cueDir = cueDir.norm();
 
     for(auto& ball: balls) {
-        if(ball.centre == striker.centre) {
+        if(ball.centre == cue_ball.centre) {
             continue;
         }
 
-        Point2f nearest = ball.findNearestCentre(striker.centre, MyPoint(Point2f(mouse_x, mouse_y) - striker.centre).norm() );
-        if(nearest == striker.centre )
+        Point2f nearest = ball.findNearestCentre(cue_ball.centre, MyPoint(Point2f(mouse_x, mouse_y) - cue_ball.centre).norm() );
+        if(nearest == cue_ball.centre )
             continue;
 
         if(draw_is)
@@ -304,7 +293,7 @@ void trajectoriesFunc() {
         // svoj shar, otskok
         MyPoint dirTang = ball.getTangentDir(dir);
         float _sign = -1;
-        if( dir.mult(stickDir).z < 0)
+        if( dir.mult(cueDir).z < 0)
             _sign = 1;
 
         dirTang = dirTang.mult(_sign);
@@ -315,10 +304,10 @@ void trajectoriesFunc() {
         // rezka
         {
             int rad = 27;
-            stickDir.y /= ball.getLeanY();
+            cueDir.y /= ball.getLeanY();
             dir.y /= ball.getLeanY();
 
-            int shift = sin(stickDir.getAngle(dir)) * rad * 2;
+            int shift = sin(cueDir.getAngle(dir)) * rad * 2;
 
             if(draw_is) {
                 circle(interaction_scene, Point(interaction_scene.size().width - 60, 60),
@@ -336,7 +325,7 @@ void trajectoriesFunc() {
 }
 
 #include "GravityProcessing.h"
-void gyroTask() {
+void graviTask() {
 //    int8_t gx, gy,gz;
 //    float leny, lenx;
 //    LPCTSTR com_port = "\\\\.\\COM7";
