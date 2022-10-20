@@ -172,7 +172,7 @@ void curl_main() {
                         curl_easy_strerror(res));
             string str(chunk.response + chunk.size - 40, 40 - 5);
             str.erase(std::remove(str.begin(), str.end(), '['), str.end());
-            printf("\n\nmy data: %s\n", str.c_str());
+//            printf("\n\nmy data: %s\n", str.c_str());
 
             //tokenize
             vector<string> tokens;
@@ -182,10 +182,10 @@ void curl_main() {
             for (int step = 0; step < 3; step++) {
                 start = str.find_last_of(",", end);
                 start += 1;
-                printf("%d\t%d\n", start, end);
+//                printf("%d\t%d\n", start, end);
                 tokens.push_back(str.substr(start, end - start));
                 end = start - 2;
-                printf("%s\n", tokens.back().c_str());
+//                printf("%s\n", tokens.back().c_str());
             }
             gx = stof(tokens[2]);
             gy = stof(tokens[1]);
@@ -199,7 +199,7 @@ void curl_main() {
                 main_rads = asin(gz / leny)+0.1;
 
             hue_rads = -asin(gy / lenx);
-            cout << "main angle: " << main_rads * 180 / 3.14 << "\thue: " << hue_rads * 180 / 3.14 << endl;
+//            cout << "main angle: " << main_rads * 180 / 3.14 << "\thue: " << hue_rads * 180 / 3.14 << endl;
 //
             /* always cleanup */
 //            curl_easy_cleanup(curl);
@@ -207,3 +207,14 @@ void curl_main() {
         }
     }
 }
+
+//Mat frame_HSV;
+//Mat gray_HSV;
+//cvtColor(src, frame_HSV, COLOR_BGR2HSV);
+//Mat hsv_bgr;
+//inRange(frame_HSV, Scalar(low_H, 0, low_V), Scalar(high_H, max_value, high_V), hsv_bgr);
+//bitwise_not(hsv_bgr, hsv_bgr);
+//cvtColor(hsv_bgr, hsv_bgr, COLOR_GRAY2BGR);
+//bitwise_and(src, hsv_bgr, src);
+//
+////        imshow("HSV", src);

@@ -1,9 +1,10 @@
+//https://docs.opencv.org/3.4/da/d97/tutorial_threshold_inRange.html
 #include <math.h>
-//#include "SimpleSerial.h"
 #include "opencv2/imgcodecs.hpp"
 #include "opencv2/highgui.hpp"
 #include "opencv2/imgproc.hpp"
 #include <thread>
+#include <queue>
 #include "MyPoint.h"
 #include <iostream>
 using namespace cv;
@@ -20,12 +21,15 @@ float hue_rads;
 float main_rads;
 struct Ball;
 vector<Ball> balls;
+
+
 uint64 len_min = 10000000;
 
 void gyroTask();
 
 struct Ball { // and ellipse, though
 public:
+    Ball():centre(0), rad(0) {}
     Ball(Vec2f c, float r) :centre(c), rad(r) {}
     float getLeanY() {
         // /2.8 is for canyon
@@ -76,94 +80,36 @@ public:
         return dir;
     }
 
+    bool isSame(const Ball& b) {
+        float tolerance = 7;
+        auto p = b.centre-centre;
+        return ((sqrt(p.dot(p)) < tolerance)&&
+            (fabs(rad-b.rad) < tolerance));
+    }
+
+    Ball(const Ball& b) {
+        rad = b.rad;
+        centre = b.centre;
+//        return
+    }
+
 //private:
     Point2f centre;
     float rad;
     static constexpr float rads_per_length = 0.0025;
 };
 
-Ball striker{{},0};
-Ball horiz_ball{{},0};
-
-void trajectoriesFunc() {
-
-    interaction_scene = src.clone();
-    // cursor
-
-    circle( interaction_scene, Point(mouse_x,mouse_y), 1, Scalar(0,100,100), 2, LINE_AA);
-
-    // for  stick
-    MyPoint p(Point2f(mouse_x,mouse_y) - striker.centre);
-    p = p.norm().mult(striker.rad);
-    if(p.y > 0) {
-        p = p.mult(striker.getLean(p.getAtan()));
-    }
-    Point2f intend{ p.x, p.y};
-
-    // draw stick
-    if(draw_is)
-    line(interaction_scene, Point(mouse_x,mouse_y), striker.centre + intend , Scalar(255,210,210), 5);
-
-    MyPoint stickDir{Point2f(mouse_x,mouse_y) - striker.centre};
-    stickDir = stickDir.norm();
-
-    for(auto& ball: balls) {
-        if(ball.centre == striker.centre) {
-            continue;
-        }
-
-        Point2f nearest = ball.findNearestCentre(striker.centre, MyPoint(Point2f(mouse_x, mouse_y) - striker.centre).norm() );
-        if(nearest == striker.centre )
-            continue;
-
-        if(draw_is)
-        ellipse(interaction_scene, nearest, {(int)ball.rad, static_cast<int>(ball.rad * ball.getLeanY())}, 0, 0,
-                180, Scalar(100,255,100), 2);
-
-        int radius = ball.rad;
-
-        if(draw_is)
-        circle( interaction_scene, nearest, radius, Scalar(200,255,100), 2, LINE_AA);
-
-        // and final direction
-        MyPoint dir(ball.centre - nearest);
-        dir = dir.norm();
-        dir = dir.mult(1000);
-
-        if(draw_is)
-        line(interaction_scene, ball.centre, ball.centre + Point2f{dir.x, dir.y} , Scalar(255,0,255), 2);
-
-        // svoj shar, otskok
-        MyPoint dirTang = ball.getTangentDir(dir);
-        float _sign = -1;
-        if( dir.mult(stickDir).z < 0)
-            _sign = 1;
-
-        dirTang = dirTang.mult(_sign);
-
-        if(draw_is)
-        line(interaction_scene, nearest, nearest + Point2f{dirTang.x, dirTang.y} , Scalar(200,255,100), 2);
-
-        // rezka
-        {
-            int rad = 27;
-            stickDir.y /= ball.getLeanY();
-            dir.y /= ball.getLeanY();
-
-            int shift = sin(stickDir.getAngle(dir)) * rad * 2;
-
-            if(draw_is) {
-                circle(interaction_scene, Point(interaction_scene.size().width - 60, 60),
-                       rad, Scalar(0, 255, 255), -2, LINE_AA);
-                circle(interaction_scene, Point(interaction_scene.size().width - 60 + shift, 60),
-                       rad, Scalar(255, 0, 255), -2, LINE_AA);
-            }
-        }
-    }
-
-    imshow("billiard", interaction_scene);
-//        cout << "Mouse move over the window - position (" << x << ", " << y << ")" << endl;
+Ball operator+(const Ball& b1, const Ball& b2) {
+    Ball res;
+    res.centre = b2.centre + b1.centre;
+    res.rad = b1.rad + b2.rad;
+    return res;
 }
+
+Ball striker;
+Ball horiz_ball;
+vector<deque<Ball>> correctors;
+void trajectoriesFunc();
 
 void CallBackFunc(int event, int x, int y, int flags, void* userdata)
 {
@@ -179,24 +125,26 @@ void CallBackFunc(int event, int x, int y, int flags, void* userdata)
     }
 }
 
-#define DEBUG
+//#define DEBUG
 const char *filename = "billiard.jpg";
 string ip_addr = //"192.168.40.178:8080";
-                    "192.168.0.100:8080";
+        "192.168.0.100:8080";
 int main()
 {
     namedWindow( "billiard");
-
-#ifndef DEBUG
+#ifndef DEBUG // usual
     gravity_thread = thread(gyroTask);
     gravity_thread.detach();
 
     VideoCapture cap("http://" +ip_addr +"//video?x.mjpeg&req_fps=10");
     while(!cap.isOpened());
+#else //debug
+
 #endif
 
     setMouseCallback("billiard", CallBackFunc, NULL);
 
+    /////////
     for(;;) {
 #ifdef DEBUG
         src = imread( filename );
@@ -211,9 +159,7 @@ int main()
         auto matrix = getRotationMatrix2D(
                 Point2f{(float)src.size().width/2, (float)src.size().height/2}, hue_rads*180/3.14, 1);
         warpAffine(src, src, matrix, src.size());
-
 #endif
-
 
         // Check if image is loaded fine
         if (src.empty()) {
@@ -226,9 +172,9 @@ int main()
         cvtColor(src, gray, COLOR_BGR2GRAY);
         medianBlur(gray, gray, 7);
         vector<Vec3f> circles;
-        HoughCircles(gray, circles, HOUGH_GRADIENT, 1.1,
+        HoughCircles(gray, circles, HOUGH_GRADIENT, 1.,
                      gray.rows / 16,  // change this value to detect circles with different distances to each other
-                     120, 30, 7, 50 // change the last two parameters
+                     140, 40, 7, 50 // change the last two parameters 180 50
                 // (min_radius & max_radius) to detect larger circles
         );
 
@@ -236,12 +182,45 @@ int main()
         for (const auto &circle: circles) {
             balls.emplace_back(Vec2f(circle[0], circle[1]), circle[2]);
         }
-
         sort(balls.begin(), balls.end(), [](Ball a, Ball b){return a.centre.y>b.centre.y;});
+
+        //correction update
+        correctors.resize(balls.size());
+        for (int i = 0; i<balls.size(); i++) {
+            auto& deq = correctors[i];
+            bool same = true;
+            for(auto& ex: deq) {
+                same = same && balls[i].isSame(ex);
+
+            }
+            if(same) {
+                deq.push_back(balls[i]);
+            } else {
+                cout<<"clear"<<endl;
+                deq.clear();
+                deq.push_back(balls[i]);
+            }
+            if(correctors[i].size()>7)
+                correctors[i].pop_front();
+
+            // correction itself
+            Ball acc;
+            balls[i] = Ball();
+            for(Ball b: deq) {
+                acc = acc + b;
+            }
+
+            if(deq.size()) {
+                balls[i].rad = acc.rad / deq.size();
+                balls[i].centre.x = acc.centre.x / deq.size();
+                balls[i].centre.y = acc.centre.y / deq.size();
+            }
+        }
 
         int rad_max = 0;
         int ind = 0;
         for (auto &ball: balls) {
+
             Point2f center = ball.centre;
             if (ball.rad > rad_max) {
                 rad_max = ball.rad;
@@ -272,6 +251,88 @@ int main()
     }
     //    serial->close();
     return EXIT_SUCCESS;
+}
+
+void trajectoriesFunc() {
+
+    interaction_scene = src.clone();
+    // cursor
+
+    circle( interaction_scene, Point(mouse_x,mouse_y), 1, Scalar(0,100,100), 2, LINE_AA);
+
+    // for  stick
+    MyPoint p(Point2f(mouse_x,mouse_y) - striker.centre);
+    p = p.norm().mult(striker.rad);
+    if(p.y > 0) {
+        p = p.mult(striker.getLean(p.getAtan()));
+    }
+    Point2f intend{ p.x, p.y};
+
+    // draw stick
+    if(draw_is)
+        line(interaction_scene, Point(mouse_x,mouse_y), striker.centre + intend , Scalar(255,210,210), 5);
+
+    MyPoint stickDir{Point2f(mouse_x,mouse_y) - striker.centre};
+    stickDir = stickDir.norm();
+
+    for(auto& ball: balls) {
+        if(ball.centre == striker.centre) {
+            continue;
+        }
+
+        Point2f nearest = ball.findNearestCentre(striker.centre, MyPoint(Point2f(mouse_x, mouse_y) - striker.centre).norm() );
+        if(nearest == striker.centre )
+            continue;
+
+        if(draw_is)
+            ellipse(interaction_scene, nearest, {(int)ball.rad, static_cast<int>(ball.rad * ball.getLeanY())}, 0, 0,
+                    180, Scalar(100,255,100), 2);
+
+        int radius = ball.rad;
+
+        if(draw_is)
+            circle( interaction_scene, nearest, radius, Scalar(200,255,100), 2, LINE_AA);
+
+        // and final direction
+        MyPoint dir(ball.centre - nearest);
+        dir = dir.norm();
+        dir = dir.mult(1000);
+
+        if(draw_is)
+            line(interaction_scene, ball.centre, ball.centre + Point2f{dir.x, dir.y} , Scalar(255,0,255), 2);
+
+        // svoj shar, otskok
+        MyPoint dirTang = ball.getTangentDir(dir);
+        float _sign = -1;
+        if( dir.mult(stickDir).z < 0)
+            _sign = 1;
+
+        dirTang = dirTang.mult(_sign);
+
+        if(draw_is)
+            line(interaction_scene, nearest, nearest + Point2f{dirTang.x, dirTang.y} , Scalar(200,255,100), 2);
+
+        // rezka
+        {
+            int rad = 27;
+            stickDir.y /= ball.getLeanY();
+            dir.y /= ball.getLeanY();
+
+            int shift = sin(stickDir.getAngle(dir)) * rad * 2;
+
+            if(draw_is) {
+                circle(interaction_scene, Point(interaction_scene.size().width - 60, 60),
+                       rad, Scalar(0, 255, 255), -2, LINE_AA);
+                line(interaction_scene, Point(interaction_scene.size().width - 60, 60 - rad) ,
+                     Point(interaction_scene.size().width - 60, 60 + rad),Scalar(0,0,0), 1);
+                circle(interaction_scene, Point(interaction_scene.size().width - 60 + shift, 60),
+                       rad, Scalar(255, 0, 255), -2, LINE_AA);
+            }
+        }
+    }
+
+    imshow("billiard", interaction_scene);
+//        cout << "Mouse move over the window - position (" << x << ", " << y << ")" << endl;
 }
 
 #include "GravityProcessing.h"
