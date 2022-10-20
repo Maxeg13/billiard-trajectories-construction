@@ -179,33 +179,28 @@ void CallBackFunc(int event, int x, int y, int flags, void* userdata)
     }
 }
 
-
-string ip_addr = "192.168.40.178:8080";
-//                    "192.168.0.100:8080";
+#define DEBUG
+const char *filename = "billiard.jpg";
+string ip_addr = //"192.168.40.178:8080";
+                    "192.168.0.100:8080";
 int main()
 {
+    namedWindow( "billiard");
+
+#ifndef DEBUG
     gravity_thread = thread(gyroTask);
     gravity_thread.detach();
 
     VideoCapture cap("http://" +ip_addr +"//video?x.mjpeg&req_fps=10");
-
     while(!cap.isOpened());
+#endif
 
-    // Loads an image
-    const char *filename = "billiard.jpg";
-//    src = imread( filename );
-    cap >> src;
-    resize(src,src,src.size()/2);
-    imshow("billiard", src);
     setMouseCallback("billiard", CallBackFunc, NULL);
 
-
     for(;;) {
-        // Loads an image
-        const char *filename = "billiard.jpg";
-
-
-//        src = imread( filename );
+#ifdef DEBUG
+        src = imread( filename );
+#else
         cap >> src;
         if(src.empty()) {
 
@@ -216,6 +211,9 @@ int main()
         auto matrix = getRotationMatrix2D(
                 Point2f{(float)src.size().width/2, (float)src.size().height/2}, hue_rads*180/3.14, 1);
         warpAffine(src, src, matrix, src.size());
+
+#endif
+
 
         // Check if image is loaded fine
         if (src.empty()) {
