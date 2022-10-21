@@ -99,6 +99,13 @@ public:
         return m/(sqrt(l2()) * sqrt(p.l2()));
     }
 
+    MyPoint rotate(float phi) {
+        float x_, y_;
+        x_ = x * cos(phi) + y * sin(phi);
+        y_ = y * cos(phi) - x * sin(phi);
+        return {x_,y_, z};
+    }
+
     float x;
     float y;
     float z;

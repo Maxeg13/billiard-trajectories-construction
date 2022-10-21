@@ -12,7 +12,7 @@ using namespace cv;
 using namespace std;
 int mouse_x;
 int mouse_y;
-int horiz;
+int test_val = 0;
 bool draw_is = true;
 Mat src;
 Mat interaction_scene;
@@ -31,11 +31,24 @@ public:
     Ball():centre(0), rad(0) {}
     Ball(Vec2f c, float r) :centre(c), rad(r) {}
     float getLeanY() {
-        // /2.8 is for canyon
-        return(fabs(sin(  main_rads+ rads_per_length/3.4 * (centre.y - src.size().height/2))));
+        //  rads_per_length /2.8 is for canyon, /3.4 for samsung
+        return(fabs(sin(  main_rads + rads_per_length/3.4 * (centre.y - src.size().height/2 + test_val))));
+    }
+    float getLeanX() {
+        return(fabs(sin(  rads_per_length * (centre.x - src.size().width/2 ))));
     }
     float getX(float phi) {
         return rad * cos(phi);
+    }
+    MyPoint fromAffine(MyPoint x) {
+//        x.x/=getLeanX();
+        x.y/=getLeanY();
+        return x;
+    }
+    MyPoint toAffine(MyPoint x) {
+//        x.x*=getLeanX();
+        x.y*=getLeanY();
+        return x;
     }
 
     float getY(float phi) {
@@ -115,7 +128,7 @@ void CallBackFunc(int event, int x, int y, int flags, void* userdata)
         cout<<"mouse interface, ";
         static int cnt = 0;
         cnt++;
-        switch(cnt%2) {
+        switch(cnt%3) {
             case 0:
                 cout<<"param1"<<endl;
                 mouse_interface = &param1;
@@ -124,8 +137,11 @@ void CallBackFunc(int event, int x, int y, int flags, void* userdata)
                 cout<<"param2"<<endl;
                 mouse_interface = &param2;
                 break;
+            case 2:
+                cout<<"test_val"<<endl;
+                mouse_interface = &test_val;
+                break;
         }
-
     }
     else if ( event == EVENT_MOUSEMOVE )
     {
@@ -140,7 +156,7 @@ void CallBackFunc(int event, int x, int y, int flags, void* userdata)
     }
 }
 
-#define DEBUG
+//#define DEBUG
 const char *filename = "billiard.jpg";
 string ip_addr = //"192.168.40.178:8080";
         "192.168.0.100:8080";
@@ -271,81 +287,106 @@ void trajectoriesFunc() {
     interaction_scene = src.clone();
     // cursor
 
-    circle( interaction_scene, Point(mouse_x,mouse_y), 1, Scalar(0,100,100), 2, LINE_AA);
+    circle(interaction_scene, Point(mouse_x, mouse_y), 1, Scalar(0, 100, 100), 2, LINE_AA);
 
     // for  cue
-    MyPoint p(Point2f(mouse_x,mouse_y) - cue_ball.centre);
+    MyPoint p(Point2f(mouse_x, mouse_y) - cue_ball.centre);
     p = p.norm().mult(cue_ball.rad);
-    if(p.y > 0) {
+    if (p.y > 0) {
         p = p.mult(cue_ball.getLean(p.getAtan()));
     }
-    Point2f intend{ p.x, p.y};
+    Point2f indent{p.x, p.y};
 
     // draw cue
-    if(draw_is)
-        line(interaction_scene, Point(mouse_x,mouse_y), cue_ball.centre + intend , Scalar(255, 210, 210), 5);
+    if (draw_is)
+        line(interaction_scene, Point(mouse_x, mouse_y), cue_ball.centre + indent, Scalar(255, 210, 210), 5);
 
-    MyPoint cueDir{Point2f(mouse_x,mouse_y) - cue_ball.centre};
+    MyPoint cueDir{Point2f(mouse_x, mouse_y) - cue_ball.centre};
     cueDir = cueDir.norm();
 
-    for(auto& ball: balls) {
-        if(ball.centre == cue_ball.centre) {
+    for (auto &ball: balls) {
+        if (ball.centre == cue_ball.centre) {
             continue;
         }
 
-        Point2f nearest = ball.findNearestCentre(cue_ball.centre, MyPoint(Point2f(mouse_x, mouse_y) - cue_ball.centre).norm() );
-        if(nearest == cue_ball.centre )
+        Point2f nearest = ball.findNearestCentre(cue_ball.centre,
+                                                 MyPoint(Point2f(mouse_x, mouse_y) - cue_ball.centre).norm());
+        if (nearest == cue_ball.centre)
             continue;
 
-        if(draw_is)
-            ellipse(interaction_scene, nearest, {(int)ball.rad, static_cast<int>(ball.rad * ball.getLeanY())}, 0, 0,
-                    180, Scalar(100,255,100), 2);
+        MyPoint halfDir = (MyPoint(nearest).add(ball.centre)).mult(0.5).sub(cue_ball.centre);
+
+        if (MyPoint(ball.centre - cue_ball.centre).multScal(cueDir) < 0)
+            cueDir.setMult(-1);
+
+        if (draw_is)
+            ellipse(interaction_scene, nearest, {(int) ball.rad, static_cast<int>(ball.rad * ball.getLeanY())}, 0, 0,
+                    180, Scalar(100, 255, 100), 2);
 
         int radius = ball.rad;
 
-        if(draw_is)
-            circle( interaction_scene, nearest, radius, Scalar(200,255,100), 2, LINE_AA);
+        if (draw_is)
+            circle(interaction_scene, nearest, radius, Scalar(200, 255, 100), 2, LINE_AA);
 
         // and final direction
-        MyPoint dir(ball.centre - nearest);
-        dir = dir.norm();
-        dir = dir.mult(1000);
+        MyPoint objDir(ball.centre - nearest);
+        objDir = objDir.norm();
+        objDir = objDir.mult(1000);
 
-        if(draw_is)
-            line(interaction_scene, ball.centre, ball.centre + Point2f{dir.x, dir.y} , Scalar(255,0,255), 2);
+        if (draw_is)
+            line(interaction_scene, ball.centre, ball.centre + Point2f{objDir.x, objDir.y}, Scalar(255, 0, 255), 2);
 
         // svoj shar, otskok
-        MyPoint dirTang = ball.getTangentDir(dir);
-        float _sign = -1;
-        if( dir.mult(cueDir).z < 0)
-            _sign = 1;
+        MyPoint dirTang = ball.getTangentDir(objDir);
+        float cueSign = 1;
+        if (objDir.mult(cueDir).z < 0)
+            cueSign = -1;
 
-        dirTang = dirTang.mult(_sign);
+        dirTang = dirTang.mult(cueSign);
 
-        if(draw_is)
-            line(interaction_scene, nearest, nearest + Point2f{dirTang.x, dirTang.y} , Scalar(200,255,100), 2);
+        if (draw_is)
+            line(interaction_scene, nearest, nearest + Point2f{dirTang.x, dirTang.y}, Scalar(200, 255, 100), 2);
 
-        // rezka
-        {
-            int rad = 27;
-            cueDir.y /= ball.getLeanY();
-            dir.y /= ball.getLeanY();
+        ///////////////////
+        // cut
+        int cut_rad = 27;
+        cueDir.y /= ball.getLeanY();
+        objDir.y /= ball.getLeanY();
 
-            int shift = sin(cueDir.getAngle(dir)) * rad * 2;
+        float cut = sin(cueDir.getAngle(objDir));
+        int shift = -cut * cut_rad * 2;
+        bool is_golden = ((fabs(cut) <= 0.5) && (fabs(cut) > 0.35));
 
-            if(draw_is) {
-                circle(interaction_scene, Point(interaction_scene.size().width - 60, 60),
-                       rad, Scalar(0, 255, 255), -2, LINE_AA);
-                line(interaction_scene, Point(interaction_scene.size().width - 60, 60 - rad) ,
-                     Point(interaction_scene.size().width - 60, 60 + rad),Scalar(0,0,0), 1);
-                circle(interaction_scene, Point(interaction_scene.size().width - 60 + shift, 60),
-                       rad, Scalar(255, 0, 255), -2, LINE_AA);
-            }
+        if (draw_is) {
+            circle(interaction_scene, Point(interaction_scene.size().width - 60, 60),
+                   cut_rad, Scalar(0, 255, 255), -2, LINE_AA);
+            line(interaction_scene, Point(interaction_scene.size().width - 60, 60 - cut_rad),
+                 Point(interaction_scene.size().width - 60, 60 + cut_rad), Scalar(0, 0, 0), 1);
+            circle(interaction_scene, Point(interaction_scene.size().width - 60 + shift, 60),
+                   cut_rad, Scalar(255, 0, 255), -2, LINE_AA);
+        }
+        cueDir.y *= ball.getLeanY();
+        objDir.y *= ball.getLeanY();
+
+        // golden trajectories
+        if (draw_is && is_golden) {
+            MyPoint goldenDir1(ball.fromAffine(halfDir)), goldenDir2(ball.fromAffine(halfDir));
+            goldenDir1 = goldenDir1.rotate(-31 * cueSign / (180 / 3.14));
+            goldenDir2 = goldenDir2.rotate(-39 * cueSign / (180 / 3.14));
+            goldenDir1.setMult(5000);
+            goldenDir2.setMult(5000);
+            goldenDir1 = ball.toAffine(goldenDir1);
+            goldenDir2 = ball.toAffine(goldenDir2);
+//            Mat mask = Mat::zeros(interaction_scene);
+            Mat mask = Mat::zeros(interaction_scene.size(), interaction_scene.type());
+            vector<Point> poly{nearest, nearest + Point2f{goldenDir1.x, goldenDir1.y},
+                                 nearest + Point2f{goldenDir2.x, goldenDir2.y}};
+            fillPoly(mask, poly, Scalar(0, 100, 100));
+            bitwise_or(interaction_scene, mask, interaction_scene);
         }
     }
 
     imshow("billiard", interaction_scene);
-//        cout << "Mouse move over the window - position (" << x << ", " << y << ")" << endl;
 }
 
 #include "GravityProcessing.h"
