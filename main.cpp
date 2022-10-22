@@ -15,6 +15,7 @@ int mouse_y;
 int test_val = 0;
 bool draw_is = true;
 Mat src;
+Mat interaction_mask;
 Mat interaction_scene;
 thread gravity_thread;
 float hue_rads;
@@ -113,7 +114,7 @@ Ball operator+(const Ball& b1, const Ball& b2) {
 Ball cue_ball;
 vector<deque<Ball>> correctors;
 void trajectoriesFunc();
-int param1 = 140, param2 = 40;
+int param1 = 140, param2 = 27;
 int* mouse_interface = &param1;
 
 void CallBackFunc(int event, int x, int y, int flags, void* userdata)
@@ -158,8 +159,8 @@ void CallBackFunc(int event, int x, int y, int flags, void* userdata)
 
 //#define DEBUG
 const char *filename = "billiard.jpg";
-string ip_addr = //"192.168.40.178:8080";
-        "192.168.0.100:8080";
+string ip_addr = "192.168.162.219:8080";
+//        "192.168.0.100:8080";
 int main()
 {
     namedWindow( "billiard");
@@ -200,7 +201,7 @@ int main()
         }
         Mat gray;
         cvtColor(src, gray, COLOR_BGR2GRAY);
-        medianBlur(gray, gray, 7);
+        medianBlur(gray, gray, 5);
         vector<Vec3f> circles;
         HoughCircles(gray, circles, HOUGH_GRADIENT, 1.,
                      gray.rows / 16,  // change this value to detect circles with different distances to each other
@@ -260,7 +261,7 @@ int main()
             int radius = ball.rad;
 
             // circle center
-            circle(src, center, 1, Scalar(0, 100, 100), 2, LINE_AA);
+            circle(src, center, 1, Scalar(0, 100, 100), 1, LINE_AA);
 
             // circle outline
             circle(src, center, radius, Scalar(255, 0, 255), 2, LINE_AA);
@@ -285,6 +286,8 @@ int main()
 void trajectoriesFunc() {
 
     interaction_scene = src.clone();
+    if(draw_is)
+        interaction_mask = Mat::zeros(interaction_scene.size(), interaction_scene.type());
     // cursor
 
     circle(interaction_scene, Point(mouse_x, mouse_y), 1, Scalar(0, 100, 100), 2, LINE_AA);
@@ -299,7 +302,7 @@ void trajectoriesFunc() {
 
     // draw cue
     if (draw_is)
-        line(interaction_scene, Point(mouse_x, mouse_y), cue_ball.centre + indent, Scalar(255, 210, 210), 5);
+        line(interaction_mask, Point(mouse_x, mouse_y), cue_ball.centre + indent, Scalar(255, 210, 210), 5);
 
     MyPoint cueDir{Point2f(mouse_x, mouse_y) - cue_ball.centre};
     cueDir = cueDir.norm();
@@ -320,13 +323,13 @@ void trajectoriesFunc() {
             cueDir.setMult(-1);
 
         if (draw_is)
-            ellipse(interaction_scene, nearest, {(int) ball.rad, static_cast<int>(ball.rad * ball.getLeanY())}, 0, 0,
+            ellipse(interaction_mask, nearest, {(int) ball.rad, static_cast<int>(ball.rad * ball.getLeanY())}, 0, 0,
                     180, Scalar(100, 255, 100), 2);
 
         int radius = ball.rad;
 
         if (draw_is)
-            circle(interaction_scene, nearest, radius, Scalar(200, 255, 100), 2, LINE_AA);
+            circle(interaction_mask, nearest, radius, Scalar(200, 255, 100), 2, LINE_AA);
 
         // and final direction
         MyPoint objDir(ball.centre - nearest);
@@ -334,7 +337,7 @@ void trajectoriesFunc() {
         objDir = objDir.mult(1000);
 
         if (draw_is)
-            line(interaction_scene, ball.centre, ball.centre + Point2f{objDir.x, objDir.y}, Scalar(255, 0, 255), 2);
+            line(interaction_mask, ball.centre, ball.centre + Point2f{objDir.x, objDir.y}, Scalar(255, 0, 255), 2);
 
         // svoj shar, otskok
         MyPoint dirTang = ball.getTangentDir(objDir);
@@ -345,7 +348,7 @@ void trajectoriesFunc() {
         dirTang = dirTang.mult(cueSign);
 
         if (draw_is)
-            line(interaction_scene, nearest, nearest + Point2f{dirTang.x, dirTang.y}, Scalar(200, 255, 100), 2);
+            line(interaction_mask, nearest, nearest + Point2f{dirTang.x, dirTang.y}, Scalar(200, 255, 100), 2);
 
         ///////////////////
         // cut
@@ -358,11 +361,11 @@ void trajectoriesFunc() {
         bool is_golden = ((fabs(cut) <= 0.5) && (fabs(cut) > 0.35));
 
         if (draw_is) {
-            circle(interaction_scene, Point(interaction_scene.size().width - 60, 60),
+            circle(interaction_mask, Point(interaction_scene.size().width - 60, 60),
                    cut_rad, Scalar(0, 255, 255), -2, LINE_AA);
-            line(interaction_scene, Point(interaction_scene.size().width - 60, 60 - cut_rad),
+            line(interaction_mask, Point(interaction_scene.size().width - 60, 60 - cut_rad),
                  Point(interaction_scene.size().width - 60, 60 + cut_rad), Scalar(0, 0, 0), 1);
-            circle(interaction_scene, Point(interaction_scene.size().width - 60 + shift, 60),
+            circle(interaction_mask, Point(interaction_scene.size().width - 60 + shift, 60),
                    cut_rad, Scalar(255, 0, 255), -2, LINE_AA);
         }
         cueDir.y *= ball.getLeanY();
@@ -377,14 +380,16 @@ void trajectoriesFunc() {
             goldenDir2.setMult(5000);
             goldenDir1 = ball.toAffine(goldenDir1);
             goldenDir2 = ball.toAffine(goldenDir2);
-//            Mat mask = Mat::zeros(interaction_scene);
             Mat mask = Mat::zeros(interaction_scene.size(), interaction_scene.type());
             vector<Point> poly{nearest, nearest + Point2f{goldenDir1.x, goldenDir1.y},
                                  nearest + Point2f{goldenDir2.x, goldenDir2.y}};
             fillPoly(mask, poly, Scalar(0, 100, 100));
-            bitwise_or(interaction_scene, mask, interaction_scene);
+            bitwise_or(interaction_mask, mask, interaction_mask);
         }
     }
+
+//    if(draw_is)
+    bitwise_or(interaction_mask, interaction_scene, interaction_scene);
 
     imshow("billiard", interaction_scene);
 }
