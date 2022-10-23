@@ -190,7 +190,7 @@ void curl_main() {
             gx = stof(tokens[2]);
             gy = stof(tokens[1]);
             gz = stof(tokens[0]);
-            cout << endl << gx << "\t" << gy << "\t" << gz << endl;
+//            cout << endl << gx << "\t" << gy << "\t" << gz << endl;
             leny = (float) gx * gx + (float) gz * gz;
             leny = sqrt(leny);
             lenx = (float) gx * gx + (float) gy * gy;

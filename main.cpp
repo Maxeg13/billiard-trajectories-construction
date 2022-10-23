@@ -7,12 +7,13 @@
 #include <thread>
 #include <queue>
 #include "MyPoint.h"
+#include "Ball.h"
 #include <iostream>
 using namespace cv;
 using namespace std;
 int mouse_x;
 int mouse_y;
-int test_val = 0;
+int hor_correction = 0;
 bool draw_is = true;
 Mat src;
 Mat interaction_mask;
@@ -20,102 +21,43 @@ Mat interaction_scene;
 thread gravity_thread;
 float hue_rads;
 float main_rads;
-struct Ball;
+
+struct Test {
+    MyPoint origin;
+    MyPoint dir;
+    MyPoint ortho;
+    static constexpr float rads_per_length = 0.0025;
+    float getLeanX() {
+        return(fabs(sin(  rads_per_length * (centre.x - src.size().width/2 ))));
+    }
+    float getLeanY() {
+        //  rads_per_length /2.8 is for canyon, /3.4 for samsung
+        return(fabs(sin(  main_rads + rads_per_length/3.4 * (origin.y - src.size().height/2 + hor_correction))));
+    }
+    MyPoint computeOrtho() {
+        MyPoint tmp(dir);
+        tmp.y /= getLeanY();
+        ortho = tmp.rotate(3.14/2);
+        ortho.y *= getLeanY();
+        return ortho;
+    }
+};
+
+Test test{MyPoint(200,200), MyPoint(100,100), MyPoint(100,70)};
+
 vector<Ball> balls;
 
 uint64 len_min = 10000000;
 
 void graviTask();
 
-struct Ball { // and ellipse, though
-public:
-    Ball():centre(0), rad(0) {}
-    Ball(Vec2f c, float r) :centre(c), rad(r) {}
-    float getLeanY() {
-        //  rads_per_length /2.8 is for canyon, /3.4 for samsung
-        return(fabs(sin(  main_rads + rads_per_length/3.4 * (centre.y - src.size().height/2 + test_val))));
-    }
-    float getLeanX() {
-        return(fabs(sin(  rads_per_length * (centre.x - src.size().width/2 ))));
-    }
-    float getX(float phi) {
-        return rad * cos(phi);
-    }
-    MyPoint fromAffine(MyPoint x) {
-//        x.x/=getLeanX();
-        x.y/=getLeanY();
-        return x;
-    }
-    MyPoint toAffine(MyPoint x) {
-//        x.x*=getLeanX();
-        x.y*=getLeanY();
-        return x;
-    }
-
-    float getY(float phi) {
-        return rad * sin(phi) * getLeanY();
-    }
-
-    float getLean(float phi) {
-        return(sqrt(cos(phi) * cos(phi) + getLeanY() * getLeanY() * sin(phi) * sin(phi)));
-    }
-
-    Point2f findNearestCentre(MyPoint origin, MyPoint direction) {
-        Point2f cen;
-        len_min = 10000000;
-        for(float phi = -3.14; phi < 3.14; phi += 0.002) {
-            MyPoint tmp{2 * getX(phi), 2 * getY(phi), 0};
-            tmp.setAdd(MyPoint{centre});
-            tmp.setSub(origin);
-            uint64 len = tmp.l2();
-            if( direction.mult(tmp.norm()).l2() < 0.000002 ) {
-                if( len < len_min) {
-//                    cout<<"len_min: "<< len_min<<"\tlen: "<<len<<"\t\tphi: "<<phi<<endl;
-                    len_min = len;
-//                    cout<<"now len_min: "<< len_min<<endl;
-                    cen.x = tmp.x;
-                    cen.y = tmp.y;
-                }
-            }
-        }
-        cen.x += origin.x;
-        cen.y += origin.y;
-        return cen;
-    }
-
-    MyPoint getTangentDir(MyPoint dir) {
-        float tmp;
-        tmp = dir.x;
-        dir.x = -dir.y;
-        dir.y = getLeanY() * getLeanY() * tmp;
-        return dir;
-    }
-
-    bool isSame(const Ball& b) {
-        float tolerance = 7;
-        auto p = b.centre-centre;
-        return ((sqrt(p.dot(p)) < tolerance)&&
-            (fabs(rad-b.rad) < tolerance));
-    }
-
-//private:
-    Point2f centre;
-    float rad;
-    static constexpr float rads_per_length = 0.0025;
-};
-
-Ball operator+(const Ball& b1, const Ball& b2) {
-    Ball res;
-    res.centre = b2.centre + b1.centre;
-    res.rad = b1.rad + b2.rad;
-    return res;
-}
-
 Ball cue_ball;
 vector<deque<Ball>> correctors;
 void trajectoriesFunc();
 int param1 = 140, param2 = 27;
+int test_val;
 int* mouse_interface = &param1;
+
 
 void CallBackFunc(int event, int x, int y, int flags, void* userdata)
 {
@@ -129,7 +71,7 @@ void CallBackFunc(int event, int x, int y, int flags, void* userdata)
         cout<<"mouse interface, ";
         static int cnt = 0;
         cnt++;
-        switch(cnt%3) {
+        switch(cnt%4) {
             case 0:
                 cout<<"param1"<<endl;
                 mouse_interface = &param1;
@@ -139,10 +81,17 @@ void CallBackFunc(int event, int x, int y, int flags, void* userdata)
                 mouse_interface = &param2;
                 break;
             case 2:
-                cout<<"test_val"<<endl;
+                cout<<"horiz correction"<<endl;
+                mouse_interface = &hor_correction;
+                break;
+            case 3:
+                cout<<"test val"<<endl;
                 mouse_interface = &test_val;
                 break;
         }
+    }
+    else if(event == EVENT_MBUTTONDBLCLK) {
+        test.origin = {(float)mouse_x, (float)mouse_y};
     }
     else if ( event == EVENT_MOUSEMOVE )
     {
@@ -159,8 +108,8 @@ void CallBackFunc(int event, int x, int y, int flags, void* userdata)
 
 //#define DEBUG
 const char *filename = "billiard.jpg";
-string ip_addr = "192.168.162.219:8080";
-//        "192.168.0.100:8080";
+string ip_addr = //"192.168.162.219:8080";
+        "192.168.0.100:8080";
 int main()
 {
     namedWindow( "billiard");
@@ -191,6 +140,7 @@ int main()
         auto matrix = getRotationMatrix2D(
                 Point2f{(float)src.size().width/2, (float)src.size().height/2}, hue_rads*180/3.14, 1);
         warpAffine(src, src, matrix, src.size());
+//        matrix.at<>
 #endif
 
         if (src.empty()) {
@@ -222,7 +172,6 @@ int main()
             bool same = true;
             for(auto& ex: deq) {
                 same = same && balls[i].isSame(ex);
-
             }
             if(!same) {
                 cout<<"clear smoothing buf"<<endl;
@@ -388,7 +337,17 @@ void trajectoriesFunc() {
         }
     }
 
-//    if(draw_is)
+    // and test finally
+    test.dir = MyPoint(100,70);
+    test.dir = test.dir.rotate(test_val/30.);
+    test.computeOrtho();
+
+    line(interaction_mask, test.origin.toCV(),
+         (test.dir.add(test.origin)).toCV(), Scalar(100, 255, 255), 1);
+
+    line(interaction_mask, test.origin.toCV(),
+         (test.ortho.add(test.origin)).toCV(), Scalar(100, 255, 255), 1);
+
     bitwise_or(interaction_mask, interaction_scene, interaction_scene);
 
     imshow("billiard", interaction_scene);

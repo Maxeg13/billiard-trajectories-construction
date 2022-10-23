@@ -14,10 +14,15 @@ public:
     MyPoint(Point2f p): x(p.x), y(p.y) {
 
     }
+    MyPoint(float x, float y): x(x), y(y), z(0) {
+
+    }
     MyPoint(float x, float y, float z): x(x), y(y), z(z) {
 
     }
-
+    Point2f toCV() {
+        return {x, y};
+    }
     MyPoint() = default;
 
     MyPoint(const MyPoint&) = default;
