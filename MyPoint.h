@@ -71,7 +71,17 @@ public:
         z-=p.z;
         return *this;
     }
+    MyPoint multInDir(float k, MyPoint dir) {
+        dir = dir.norm();
+        MyPoint ortho(dir.rotate(3.14/2));
+        float _x = this->multScal(dir) * k;
+        float _y = this->multScal(ortho);
+        dir.setMult(_x);
+        ortho.setMult(_y);
 
+
+        return dir.add(ortho);
+    }
     MyPoint setMult(float _x) {
         x*=_x;
         y*=_x;

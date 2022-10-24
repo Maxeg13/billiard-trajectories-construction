@@ -13,6 +13,7 @@ using namespace cv;
 using namespace std;
 int mouse_x;
 int mouse_y;
+float rads_per_length = 0.0018; // 0.0025/3.4
 int hor_correction = 0;
 bool draw_is = true;
 Mat src;
@@ -21,27 +22,6 @@ Mat interaction_scene;
 thread gravity_thread;
 float hue_rads;
 float main_rads;
-
-struct Test {
-    MyPoint origin;
-    MyPoint dir;
-    MyPoint ortho;
-    static constexpr float rads_per_length = 0.0025;
-    float getLeanX() {
-        return(fabs(sin(  rads_per_length * (centre.x - src.size().width/2 ))));
-    }
-    float getLeanY() {
-        //  rads_per_length /2.8 is for canyon, /3.4 for samsung
-        return(fabs(sin(  main_rads + rads_per_length/3.4 * (origin.y - src.size().height/2 + hor_correction))));
-    }
-    MyPoint computeOrtho() {
-        MyPoint tmp(dir);
-        tmp.y /= getLeanY();
-        ortho = tmp.rotate(3.14/2);
-        ortho.y *= getLeanY();
-        return ortho;
-    }
-};
 
 Test test{MyPoint(200,200), MyPoint(100,100), MyPoint(100,70)};
 
@@ -200,7 +180,7 @@ int main()
         int rad_max = 0;
         int ind = 0;
         for (auto &ball: balls) {
-
+//            cout<<ball.getLeanY()<<endl;
             Point2f center = ball.centre;
             if (ball.rad > rad_max) {
                 rad_max = ball.rad;
@@ -223,7 +203,8 @@ int main()
 
             ind++;
         }
-
+        line(src, Point(0, src.size().height/2 - main_rads / rads_per_length),
+             Point(src.size().width, src.size().height/2 - main_rads / rads_per_length), Scalar(255, 255, 255), 1);
         trajectoriesFunc();
 
         waitKey(42);
@@ -289,21 +270,28 @@ void trajectoriesFunc() {
             line(interaction_mask, ball.centre, ball.centre + Point2f{objDir.x, objDir.y}, Scalar(255, 0, 255), 2);
 
         // svoj shar, otskok
+        MyPoint dirTangAlter = ball.fromAffine(objDir);
+        dirTangAlter = dirTangAlter.rotate(3.14/2);
+        dirTangAlter = ball.toAffine(dirTangAlter);
         MyPoint dirTang = ball.getTangentDir(objDir);
         float cueSign = 1;
         if (objDir.mult(cueDir).z < 0)
             cueSign = -1;
 
+        dirTangAlter = dirTangAlter.mult(-cueSign);
         dirTang = dirTang.mult(cueSign);
 
         if (draw_is)
             line(interaction_mask, nearest, nearest + Point2f{dirTang.x, dirTang.y}, Scalar(200, 255, 100), 2);
 
+        if (draw_is)
+            line(interaction_mask, nearest, nearest + Point2f{dirTangAlter.x, dirTangAlter.y}, Scalar(70, 255, 200), 2);
+
         ///////////////////
         // cut
         int cut_rad = 27;
-        cueDir.y /= ball.getLeanY();
-        objDir.y /= ball.getLeanY();
+        cueDir = ball.fromAffine(cueDir);
+        objDir = ball.fromAffine(objDir);
 
         float cut = sin(cueDir.getAngle(objDir));
         int shift = -cut * cut_rad * 2;
@@ -317,8 +305,8 @@ void trajectoriesFunc() {
             circle(interaction_mask, Point(interaction_scene.size().width - 60 + shift, 60),
                    cut_rad, Scalar(255, 0, 255), -2, LINE_AA);
         }
-        cueDir.y *= ball.getLeanY();
-        objDir.y *= ball.getLeanY();
+        cueDir = ball.toAffine(cueDir);
+        objDir = ball.toAffine(objDir);
 
         // golden trajectories
         if (draw_is && is_golden) {
@@ -341,6 +329,7 @@ void trajectoriesFunc() {
     test.dir = MyPoint(100,70);
     test.dir = test.dir.rotate(test_val/30.);
     test.computeOrtho();
+    test.dir = test.toAffine(test.dir);
 
     line(interaction_mask, test.origin.toCV(),
          (test.dir.add(test.origin)).toCV(), Scalar(100, 255, 255), 1);
