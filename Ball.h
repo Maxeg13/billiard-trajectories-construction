@@ -40,7 +40,20 @@ public:
         p = p.multInDir(1/(lean+0.00001), MyPoint(centre).sub(tripod));
         return p;
     }
-
+    Mat getAffine() {
+        Point2f imgCentre{50,50};
+        MyPoint p1(0, 100);
+        p1 = p1.rotate(rads_per_length * (centre.x - src.size().width/2 ));
+        MyPoint p2(p1.rotate(3.14/2));
+        p2 = p2.rotate(rads_per_length * (centre.x - src.size().width/2 ));
+        MyPoint ap1(toAffine(p1).mult(rad/80));
+        MyPoint ap2(toAffine(p2).mult(rad/80));
+        Point2f src[]= {imgCentre, p1.toCV()+imgCentre, p2.toCV()+imgCentre};
+        Point2f place = centre;
+        place += {- 0.5f * rad, -0.3f*rad + rad * sqrt(1 - getLeanY()*getLeanY())};
+        Point2f dst[]= { place, ap1.toCV() + place, ap2.toCV() + place};
+        return getAffineTransform(src, dst);
+    }
     float getY(float phi) {
         return rad * sin(phi) * getLeanY();
     }

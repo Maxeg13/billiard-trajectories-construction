@@ -86,12 +86,19 @@ void CallBackFunc(int event, int x, int y, int flags, void* userdata)
     }
 }
 
+//#define TEST
 //#define DEBUG
+#define SYMBOL
 const char *filename = "billiard.jpg";
+Mat symbol;
+Mat symbol_inter;
 string ip_addr = //"192.168.162.219:8080";
         "192.168.0.100:8080";
 int main()
 {
+    symbol = imread( "symbol.png" );
+    symbol.convertTo(symbol, -1, 1, -85);
+
     namedWindow( "billiard");
 #ifndef DEBUG // usual
     gravity_thread = thread(graviTask);
@@ -120,7 +127,6 @@ int main()
         auto matrix = getRotationMatrix2D(
                 Point2f{(float)src.size().width/2, (float)src.size().height/2}, hue_rads*180/3.14, 1);
         warpAffine(src, src, matrix, src.size());
-//        matrix.at<>
 #endif
 
         if (src.empty()) {
@@ -129,6 +135,10 @@ int main()
             printf(" Program Arguments: [image_name -- default %s] \n", filename);
             return EXIT_FAILURE;
         }
+        // src is formed
+
+        resize(symbol,symbol_inter,src.size());
+
         Mat gray;
         cvtColor(src, gray, COLOR_BGR2GRAY);
         medianBlur(gray, gray, 5);
@@ -189,6 +199,12 @@ int main()
 
             int radius = ball.rad;
 
+#ifdef SYMBOL
+            matrix = ball.getAffine();
+            warpAffine(symbol, symbol_inter, matrix, src.size());
+            bitwise_or(src, symbol_inter, src);
+#endif
+
             // circle center
             circle(src, center, 1, Scalar(0, 100, 100), 1, LINE_AA);
 
@@ -232,7 +248,7 @@ void trajectoriesFunc() {
 
     // draw cue
     if (draw_is)
-        line(interaction_mask, Point(mouse_x, mouse_y), cue_ball.centre + indent, Scalar(255, 210, 210), 5);
+        line(interaction_mask, Point(mouse_x, mouse_y), cue_ball.centre + indent, Scalar(255, 210, 210), 3);
 
     MyPoint cueDir{Point2f(mouse_x, mouse_y) - cue_ball.centre};
     cueDir = cueDir.norm();
@@ -281,9 +297,11 @@ void trajectoriesFunc() {
         dirTangAlter = dirTangAlter.mult(-cueSign);
         dirTang = dirTang.mult(cueSign);
 
+        // tang 1
         if (draw_is)
             line(interaction_mask, nearest, nearest + Point2f{dirTang.x, dirTang.y}, Scalar(200, 255, 100), 2);
 
+        // tang 2
         if (draw_is)
             line(interaction_mask, nearest, nearest + Point2f{dirTangAlter.x, dirTangAlter.y}, Scalar(70, 255, 200), 2);
 
@@ -311,8 +329,8 @@ void trajectoriesFunc() {
         // golden trajectories
         if (draw_is && is_golden) {
             MyPoint goldenDir1(ball.fromAffine(halfDir)), goldenDir2(ball.fromAffine(halfDir));
-            goldenDir1 = goldenDir1.rotate(-31 * cueSign / (180 / 3.14));
-            goldenDir2 = goldenDir2.rotate(-39 * cueSign / (180 / 3.14));
+            goldenDir1 = goldenDir1.rotate((-31+10) * cueSign / (180 / 3.14));
+            goldenDir2 = goldenDir2.rotate((-39+10) * cueSign / (180 / 3.14));
             goldenDir1.setMult(5000);
             goldenDir2.setMult(5000);
             goldenDir1 = ball.toAffine(goldenDir1);
@@ -320,12 +338,13 @@ void trajectoriesFunc() {
             Mat mask = Mat::zeros(interaction_scene.size(), interaction_scene.type());
             vector<Point> poly{nearest, nearest + Point2f{goldenDir1.x, goldenDir1.y},
                                  nearest + Point2f{goldenDir2.x, goldenDir2.y}};
-            fillPoly(mask, poly, Scalar(0, 100, 100));
-            bitwise_or(interaction_mask, mask, interaction_mask);
+            fillPoly(mask, poly, Scalar(0, 120, 100));
+            bitwise_or( mask, interaction_mask, interaction_mask);
         }
     }
 
     // and test finally
+#ifdef TEST
     test.dir = MyPoint(100,70);
     test.dir = test.dir.rotate(test_val/30.);
     test.computeOrtho();
@@ -336,6 +355,7 @@ void trajectoriesFunc() {
 
     line(interaction_mask, test.origin.toCV(),
          (test.ortho.add(test.origin)).toCV(), Scalar(100, 255, 255), 1);
+#endif
 
     bitwise_or(interaction_mask, interaction_scene, interaction_scene);
 
