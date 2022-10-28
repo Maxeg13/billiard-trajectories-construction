@@ -183,10 +183,7 @@ int main()
                 else {
                     correctors[i].pop_front();
                 }
-//                cout<<"clear smoothing buf"<<endl;
-//                deq.clear();
             }
-
 
             if(correctors[i].size()>8)
                 correctors[i].pop_front();
@@ -258,7 +255,7 @@ void trajectoriesFunc() {
         interaction_mask = Mat::zeros(interaction_scene.size(), interaction_scene.type());
     // cursor
 
-    circle(interaction_scene, Point(mouse_x, mouse_y), 1, Scalar(0, 100, 100), 2, LINE_AA);
+    circle(interaction_scene, Point(mouse_x, mouse_y), 1, Scalar(255, 255, 255), 2, LINE_AA);
 
     // for  cue
     MyPoint p(Point2f(mouse_x, mouse_y) - cue_ball.centre);
@@ -268,12 +265,15 @@ void trajectoriesFunc() {
     }
     Point2f indent{p.x, p.y};
 
-    // draw cue
-    if (draw_is)
-        line(interaction_mask, Point(mouse_x, mouse_y), cue_ball.centre + indent, Scalar(255, 210, 210), 3);
-
     MyPoint cueDir{Point2f(mouse_x, mouse_y) - cue_ball.centre};
     cueDir = cueDir.norm();
+
+    // draw cue
+    if (draw_is) {
+        line(interaction_mask, MyPoint(cue_ball.centre + indent).add(cueDir.mult(35)).toCV(),
+             cue_ball.centre + indent, Scalar(255, 210, 210), 3);
+    }
+
 
     for (auto &ball: balls) {
         if (ball.centre == cue_ball.centre) {
@@ -296,16 +296,17 @@ void trajectoriesFunc() {
 
         int radius = ball.rad;
 
-        if (draw_is)
+        if (draw_is) {
             circle(interaction_mask, nearest, radius, Scalar(200, 255, 100), 2, LINE_AA);
+        }
 
         // touching point
         MyPoint tp(nearest);
         tp.setAdd(ball.centre);
         tp.setMult(0.5);
-        circle(src, tp.toCV(), 1, Scalar(255, 255, 255), 2, LINE_AA);
+        circle(interaction_scene, tp.toCV(), 1, Scalar(255, 0, 255), 2, LINE_AA);
         if(draw_is) {
-            circle(interaction_mask, tp.toCV(), 1, Scalar(255, 255, 255), 2, LINE_AA);
+//            circle(interaction_mask, tp.toCV(), 1, Scalar(0, 255, 255), 2, LINE_AA);
         }
 
         // and final direction
@@ -362,8 +363,8 @@ void trajectoriesFunc() {
             MyPoint goldenDir1(ball.fromAffine(halfDir)), goldenDir2(ball.fromAffine(halfDir));
             goldenDir1 = goldenDir1.rotate((-31+10) * cueSign / (180 / 3.14));
             goldenDir2 = goldenDir2.rotate((-39+10) * cueSign / (180 / 3.14));
-            goldenDir1.setMult(5000);
-            goldenDir2.setMult(5000);
+            goldenDir1.setMult(700);
+            goldenDir2.setMult(700);
             goldenDir1 = ball.toAffine(goldenDir1);
             goldenDir2 = ball.toAffine(goldenDir2);
             Mat mask = Mat::zeros(interaction_scene.size(), interaction_scene.type());
