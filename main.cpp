@@ -16,6 +16,7 @@ int mouse_y;
 float rads_per_length = 0.0018; // 0.0025/3.4
 int hor_correction = 0;
 bool draw_is = true;
+bool draw_src_is = true;
 Mat src;
 Mat interaction_mask;
 Mat interaction_scene;
@@ -48,6 +49,8 @@ void CallBackFunc(int event, int x, int y, int flags, void* userdata)
     }
     else if  ( event == EVENT_RBUTTONDOWN )
     {
+        draw_src_is = ! draw_src_is;
+
         cout<<"mouse interface, ";
         static int cnt = 0;
         cnt++;
@@ -75,8 +78,10 @@ void CallBackFunc(int event, int x, int y, int flags, void* userdata)
     }
     else if ( event == EVENT_MOUSEMOVE )
     {
-        mouse_x = x;
-        mouse_y = y;
+        if(draw_is) {
+            mouse_x = x;
+            mouse_y = y;
+        }
     }
     else if( event == EVENT_MOUSEWHEEL) {
         int sign_ = (flags>0)?(1):(-1);
@@ -88,7 +93,7 @@ void CallBackFunc(int event, int x, int y, int flags, void* userdata)
 
 //#define TEST
 //#define DEBUG
-#define SYMBOL
+//#define SYMBOL
 const char *filename = "billiard.jpg";
 Mat symbol;
 Mat symbol_inter;
@@ -117,6 +122,7 @@ int main()
 #ifdef DEBUG
         src = imread( filename );
 #else
+
         cap >> src;
         if(src.empty()) {
 
@@ -163,13 +169,26 @@ int main()
             for(auto& ex: deq) {
                 same = same && balls[i].isSame(ex);
             }
-            if(!same) {
-                cout<<"clear smoothing buf"<<endl;
-                deq.clear();
+            if(deq.size() == 0) {
+                same = false;
             }
-            deq.push_back(balls[i]);
 
-            if(correctors[i].size()>7)
+            if(same) {
+                deq.push_back(balls[i]);
+            }
+            else { // bad situation, one needs to be accurate
+                if(deq.size() == 0) {
+                    deq.push_back(balls[i]);
+                }
+                else {
+                    correctors[i].pop_front();
+                }
+//                cout<<"clear smoothing buf"<<endl;
+//                deq.clear();
+            }
+
+
+            if(correctors[i].size()>8)
                 correctors[i].pop_front();
 
             // correction itself
@@ -206,19 +225,22 @@ int main()
 #endif
 
             // circle center
-            circle(src, center, 1, Scalar(0, 100, 100), 1, LINE_AA);
+            if(draw_src_is) {
+                circle(src, center, 1, Scalar(0, 100, 100), 1, LINE_AA);
 
-            // circle outline
-            circle(src, center, radius, Scalar(255, 0, 255), 2, LINE_AA);
-            putText(src, to_string(ind), (Point)center + Point(-radius, -radius), {}, 0.5, Scalar(255, 0, 255), 2,
-                    LINE_AA);
+                // circle outline
+                circle(src, center, radius, Scalar(255, 0, 255), 2, LINE_AA);
+                putText(src, to_string(ind), (Point) center + Point(-radius, -radius), {}, 0.5, Scalar(255, 0, 255), 2,
+                        LINE_AA);
 
-            // real ellipse
-            ellipse(src, center, {radius, static_cast<int>(radius * ball.getLeanY())}, 0, 0,
-                    180, Scalar(255, 0, 255),2);
-
+                // real ellipse
+                ellipse(src, center, {radius, static_cast<int>(radius * ball.getLeanY())}, 0, 0,
+                        180, Scalar(255, 0, 255), 2);
+            }
             ind++;
         }
+
+        //horizon
         line(src, Point(0, src.size().height/2 - main_rads / rads_per_length),
              Point(src.size().width, src.size().height/2 - main_rads / rads_per_length), Scalar(255, 255, 255), 1);
         trajectoriesFunc();
@@ -262,7 +284,7 @@ void trajectoriesFunc() {
                                                  MyPoint(Point2f(mouse_x, mouse_y) - cue_ball.centre).norm());
         if (nearest == cue_ball.centre)
             continue;
-
+        // here we go
         MyPoint halfDir = (MyPoint(nearest).add(ball.centre)).mult(0.5).sub(cue_ball.centre);
 
         if (MyPoint(ball.centre - cue_ball.centre).multScal(cueDir) < 0)
@@ -276,6 +298,15 @@ void trajectoriesFunc() {
 
         if (draw_is)
             circle(interaction_mask, nearest, radius, Scalar(200, 255, 100), 2, LINE_AA);
+
+        // touching point
+        MyPoint tp(nearest);
+        tp.setAdd(ball.centre);
+        tp.setMult(0.5);
+        circle(src, tp.toCV(), 1, Scalar(255, 255, 255), 2, LINE_AA);
+        if(draw_is) {
+            circle(interaction_mask, tp.toCV(), 1, Scalar(255, 255, 255), 2, LINE_AA);
+        }
 
         // and final direction
         MyPoint objDir(ball.centre - nearest);
