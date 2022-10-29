@@ -342,10 +342,14 @@ void trajectoriesFunc() {
         int cut_rad = 27;
         cueDir = ball.fromAffine(cueDir);
         objDir = ball.fromAffine(objDir);
-
-        float cut = sin(cueDir.getAngle(objDir));
+        float angle = cueDir.getAngle(objDir);
+        float cut = sin(angle);
         int shift = -cut * cut_rad * 2;
         bool is_golden = ((fabs(cut) <= 0.5) && (fabs(cut) > 0.35));
+
+        putText(interaction_scene, to_string(int(angle*180/3.14))+" gr",
+                Point(interaction_scene.size().width - 80, 120), {}, 0.5, Scalar(255, 0, 255), 2,
+                LINE_AA);
 
         if (draw_is) {
             circle(interaction_mask, Point(interaction_scene.size().width - 60, 60),

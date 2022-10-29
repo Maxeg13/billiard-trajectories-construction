@@ -195,7 +195,7 @@ void curl_main() {
             leny = sqrt(leny);
             lenx = (float) gx * gx + (float) gy * gy;
             lenx = sqrt(lenx);
-            main_rads = asin(gz / leny);
+            main_rads = asin(gz / leny)+0.03;
 
             hue_rads = -asin(gy / lenx);
 //            cout << "main angle: " << main_rads * 180 / 3.14 << "\thue: " << hue_rads * 180 / 3.14 << endl;
