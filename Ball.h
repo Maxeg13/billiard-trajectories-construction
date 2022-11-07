@@ -13,7 +13,9 @@ extern Mat src;
 struct Ball { // and ellipse, though
 public:
     Ball():centre(0), rad(0) {}
-    Ball(Vec2f c, float r) :centre(c), rad(r) {}
+    Ball(Vec2f c, float r) :centre(c), rad(r) {
+        phiEll = getEllipseAlpha();
+    }
     float getLeanY() {
         //  rads_per_length /2.8 is for canyon, /3.4 for samsung
         return(fabs(sin(  main_rads + rads_per_length * (centre.y - src.size().height/2 ))));
@@ -24,17 +26,24 @@ public:
     float getX(float phi) {
         return rad * cos(phi);
     }
+    MyPoint getTripod() {
+        MyPoint hor = getHorizont();
+        return {src.size().width/2.f, hor.y + 3.14f/2/rads_per_length};
+    }
+    MyPoint getHorizont() {
+        return {src.size().width/2.f, src.size().height/2 -main_rads/rads_per_length};
+    }
     MyPoint toAffine(MyPoint p) {
-        MyPoint hor{src.size().width/2.f, src.size().height/2 -main_rads/rads_per_length};
-        MyPoint tripod{src.size().width/2.f, hor.y + 3.14f/2/rads_per_length};
+        MyPoint hor = getHorizont();
+        MyPoint tripod = getTripod();
         float lean = fabs(cos(rads_per_length * sqrt(MyPoint(centre).sub(tripod).l2())));
 //        cout<<getLeanY()<< endl;
         p = p.multInDir(lean, MyPoint(centre).sub(tripod));
         return p;
     }
     MyPoint fromAffine(MyPoint p) {
-        MyPoint hor{src.size().width/2.f, src.size().height/2 -main_rads/rads_per_length};
-        MyPoint tripod{src.size().width/2.f, hor.y + 3.14f/2/rads_per_length};
+        MyPoint hor = getHorizont();
+        MyPoint tripod = getTripod();
         float lean = fabs(cos(rads_per_length * sqrt(MyPoint(centre).sub(tripod).l2())));
 //        cout<<getLeanY()<< endl;
         p = p.multInDir(1/(lean+0.00001), MyPoint(centre).sub(tripod));
@@ -54,6 +63,15 @@ public:
         Point2f dst[]= { place, ap1.toCV() + place, ap2.toCV() + place};
         return getAffineTransform(src, dst);
     }
+    float getEllipseAlpha() {
+        MyPoint elTang = MyPoint(centre).sub(getTripod());
+        elTang = elTang.norm();
+        elTang = fromAffine(elTang);
+        elTang = elTang.rotate(3.14/2);
+        elTang = toAffine(elTang);
+        float phi = elTang.getAngle({1., 0.});
+        return phi;
+    }
     float getY(float phi) {
         return rad * sin(phi) * getLeanY();
     }
@@ -67,6 +85,8 @@ public:
         len_min = 10000000;
         for(float phi = -3.14; phi < 3.14; phi += 0.002) {
             MyPoint tmp{2 * getX(phi), 2 * getY(phi), 0};
+            //
+            tmp = tmp.rotate(phiEll);
             tmp.setAdd(MyPoint{centre});
             tmp.setSub(origin);
             uint64 len = tmp.l2();
@@ -90,6 +110,9 @@ public:
         tmp = dir.x;
         dir.x = -dir.y;
         dir.y = getLeanY() * getLeanY() * tmp;
+
+        //
+        dir = dir.rotate(phiEll);
         return dir;
     }
 
@@ -103,6 +126,7 @@ public:
 //private:
     Point2f centre;
     float rad;
+    float phiEll;
 };
 
 Ball operator+(const Ball& b1, const Ball& b2) {

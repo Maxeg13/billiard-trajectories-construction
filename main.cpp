@@ -49,8 +49,6 @@ void CallBackFunc(int event, int x, int y, int flags, void* userdata)
     }
     else if  ( event == EVENT_RBUTTONDOWN )
     {
-        draw_src_is = ! draw_src_is;
-
         cout<<"mouse interface, ";
         static int cnt = 0;
         cnt++;
@@ -231,7 +229,8 @@ int main()
                         LINE_AA);
 
                 // real ellipse
-                ellipse(src, center, {radius, static_cast<int>(radius * ball.getLeanY())}, 0, 0,
+                float phi = ball.getEllipseAlpha();
+                ellipse(src, center, {radius, static_cast<int>(radius * ball.getLeanY())}, phi/3.14*180, 0,
                         180, Scalar(255, 0, 255), 2);
             }
             ind++;
@@ -242,7 +241,11 @@ int main()
              Point(src.size().width, src.size().height/2 - main_rads / rads_per_length), Scalar(255, 255, 255), 1);
         trajectoriesFunc();
 
-        waitKey(42);
+        if(waitKey(1) == 'g')
+        {
+            cout<<"g!"<<endl;
+            draw_src_is = ! draw_src_is;
+        }
     }
     //    serial->close();
     return EXIT_SUCCESS;
@@ -290,10 +293,12 @@ void trajectoriesFunc() {
         if (MyPoint(ball.centre - cue_ball.centre).multScal(cueDir) < 0)
             cueDir.setMult(-1);
 
-        if (draw_is)
-            ellipse(interaction_mask, nearest, {(int) ball.rad, static_cast<int>(ball.rad * ball.getLeanY())}, 0, 0,
+        // ellipse
+        if (draw_is) {
+            float phi = ball.getEllipseAlpha();
+            ellipse(interaction_mask, nearest, {(int) ball.rad, static_cast<int>(ball.rad * ball.getLeanY())}, phi/3.14*180, 0,
                     180, Scalar(100, 255, 100), 2);
-
+        }
         int radius = ball.rad;
 
         if (draw_is) {
@@ -334,8 +339,8 @@ void trajectoriesFunc() {
             line(interaction_mask, nearest, nearest + Point2f{dirTang.x, dirTang.y}, Scalar(200, 255, 100), 2);
 
         // tang 2
-        if (draw_is)
-            line(interaction_mask, nearest, nearest + Point2f{dirTangAlter.x, dirTangAlter.y}, Scalar(70, 255, 200), 2);
+//        if (draw_is)
+//            line(interaction_mask, nearest, nearest + Point2f{dirTangAlter.x, dirTangAlter.y}, Scalar(70, 255, 200), 2);
 
         ///////////////////
         // cut
@@ -365,8 +370,8 @@ void trajectoriesFunc() {
         // golden trajectories
         if (draw_is && is_golden) {
             MyPoint goldenDir1(ball.fromAffine(halfDir)), goldenDir2(ball.fromAffine(halfDir));
-            goldenDir1 = goldenDir1.rotate((-31+10) * cueSign / (180 / 3.14));
-            goldenDir2 = goldenDir2.rotate((-39+10) * cueSign / (180 / 3.14));
+            goldenDir1 = goldenDir1.rotate((-31) * cueSign / (180 / 3.14));
+            goldenDir2 = goldenDir2.rotate((-39) * cueSign / (180 / 3.14));
             goldenDir1.setMult(700);
             goldenDir2.setMult(700);
             goldenDir1 = ball.toAffine(goldenDir1);
