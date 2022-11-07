@@ -13,7 +13,8 @@ using namespace cv;
 using namespace std;
 int mouse_x;
 int mouse_y;
-float rads_per_length = 0.0018; // 0.0025/3.4
+float scale = 1.3;
+float rads_per_length = 0.0018/scale; // 0.0025/3.4
 int hor_correction = 0;
 bool draw_is = true;
 bool draw_src_is = true;
@@ -127,7 +128,7 @@ int main()
             cap.open("http://" +ip_addr +"//video?x.mjpeg&req_fps=10");
             continue;
         }
-        resize(src,src,Size(src.size().width/2.6, src.size().height/2.6));
+        resize(src,src,Size(src.size().width/2.6 * scale, src.size().height/2.6 * scale));
         auto matrix = getRotationMatrix2D(
                 Point2f{(float)src.size().width/2, (float)src.size().height/2}, hue_rads*180/3.14, 1);
         warpAffine(src, src, matrix, src.size());
@@ -231,7 +232,7 @@ int main()
                 // real ellipse
                 float phi = ball.getEllipseAlpha();
                 ellipse(src, center, {radius, static_cast<int>(radius * ball.getLeanY())}, phi/3.14*180, 0,
-                        180, Scalar(255, 0, 255), 1);
+                        180, Scalar(255, 0, 255), 2);
             }
             ind++;
         }
