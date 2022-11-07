@@ -28,7 +28,7 @@ public:
     }
     MyPoint getTripod() {
         MyPoint hor = getHorizont();
-        return {src.size().width/2.f, hor.y + 3.14f/2/rads_per_length};
+        return {src.size().width/2.f, hor.y + 3.14f/2/(rads_per_length * 1.00f)};
     }
     MyPoint getHorizont() {
         return {src.size().width/2.f, src.size().height/2 -main_rads/rads_per_length};
@@ -69,8 +69,8 @@ public:
         elTang = fromAffine(elTang);
         elTang = elTang.rotate(3.14/2);
         elTang = toAffine(elTang);
-        float phi = elTang.getAngle({1., 0.});
-        return phi;
+        phiEll = elTang.getAngle({1., 0.});
+        return phiEll;
     }
     float getY(float phi) {
         return rad * sin(phi) * getLeanY();
@@ -84,9 +84,9 @@ public:
         Point2f cen;
         len_min = 10000000;
         for(float phi = -3.14; phi < 3.14; phi += 0.002) {
-            MyPoint tmp{2 * getX(phi), 2 * getY(phi), 0};
+            MyPoint tmp{2 * getX(phi-phiEll), 2 * getY(phi-phiEll)};
             //
-            tmp = tmp.rotate(phiEll);
+            tmp = tmp.rotate(-phiEll);
             tmp.setAdd(MyPoint{centre});
             tmp.setSub(origin);
             uint64 len = tmp.l2();
@@ -105,6 +105,7 @@ public:
         return cen;
     }
 
+    // TODO: redo
     MyPoint getTangentDir(MyPoint dir) {
         float tmp;
         tmp = dir.x;

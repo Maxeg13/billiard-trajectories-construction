@@ -231,7 +231,7 @@ int main()
                 // real ellipse
                 float phi = ball.getEllipseAlpha();
                 ellipse(src, center, {radius, static_cast<int>(radius * ball.getLeanY())}, phi/3.14*180, 0,
-                        180, Scalar(255, 0, 255), 2);
+                        180, Scalar(255, 0, 255), 1);
             }
             ind++;
         }
@@ -297,7 +297,7 @@ void trajectoriesFunc() {
         if (draw_is) {
             float phi = ball.getEllipseAlpha();
             ellipse(interaction_mask, nearest, {(int) ball.rad, static_cast<int>(ball.rad * ball.getLeanY())}, phi/3.14*180, 0,
-                    180, Scalar(100, 255, 100), 2);
+                    180, Scalar(100, 255, 100), 1);
         }
         int radius = ball.rad;
 
@@ -335,12 +335,12 @@ void trajectoriesFunc() {
         dirTang = dirTang.mult(cueSign);
 
         // tang 1
-        if (draw_is)
-            line(interaction_mask, nearest, nearest + Point2f{dirTang.x, dirTang.y}, Scalar(200, 255, 100), 2);
+//        if (draw_is)
+//            line(interaction_mask, nearest, nearest + Point2f{dirTang.x, dirTang.y}, Scalar(200, 255, 100), 2);
 
         // tang 2
-//        if (draw_is)
-//            line(interaction_mask, nearest, nearest + Point2f{dirTangAlter.x, dirTangAlter.y}, Scalar(70, 255, 200), 2);
+        if (draw_is)
+            line(interaction_mask, nearest, nearest + Point2f{dirTangAlter.x, dirTangAlter.y}, Scalar(70, 255, 200), 2);
 
         ///////////////////
         // cut
